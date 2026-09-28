@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sun Flares & Aurora Chemistry Simulator</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #05060a;
+    color: #e8e8f0;
+    font-family: 'Courier New', monospace;
+    overflow-x: hidden;
+  }
+  header {
+    text-align: center;
+    padding: 18px 10px 6px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+    color: #ffd27a;
+    text-shadow: 0 0 12px rgba(255,180,80,0.6);
+  }
+  header p {
+    color: #9aa0c0;
+    font-size: 0.85rem;
+    margin: 6px 0 0;
+  }
+  .scene {
+    position: relative;
+    width: 100%;
+    max-width: 980px;
+    margin: 24px auto;
+    border: 1px solid #22243a;
+    border-radius: 10px;
+    background: #000;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+  }
+  .controls {
+    max-width: 980px;
+    margin: 0 auto 40px;
+    padding: 14px 18px;
+    background: #10111c;
+    border: 1px solid #22243a;
+    border-radius: 10px;
+  }
+  .controls h2 {
+    font-size: 0.95rem;
+    color: #7fd8ff;
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    flex-wrap: wrap;
+  }
+  .row label {
+    min-width: 200px;
+    font-size: 0.85rem;
+    color: #c7cbe6;
+  }
+  input[type="range"] {
+    flex: 1;
+    min-width: 160px;
+    accent-color: #ff9d3c;
+  }
+  .val {
+    min-width: 42px;
+    text-align: right;
+    font-size: 0.8rem;
+    color: #ffd27a;
+  }
+  button {
+    background: linear-gradient(180deg,#ff9d3c,#c9430a);
+    border: none;
+    color: #fff;
+    padding: 9px 16px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  button.aurora {
+    background: linear-gradient(180deg,#57ffb0,#0aa66b);
+  }
+  button.hemisphere {
+    background: linear-gradient(180deg,#8a7dff,#4327c9);
+  }
+  .legend {
+    font-size: 0.75rem;
+    color: #7f849e;
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>☉ SUN FLARE ENGINE // AURORA CHEMISTRY LAB</h1>
+  <p>Interactive particle simulations — solar plasma eruptions & atmospheric gas excitation</p>
+</header>
+
+<div class="scene">
+  <canvas id="sunCanvas" width="960" height="480"></canvas>
+</div>
+<div class="controls">
+  <h2>Solar Flare Controls</h2>
+  <div class="row">
+    <label for="flareSize">Flare / CME size</label>
+    <input type="range" id="flareSize" min="10" max="100" value="45">
+    <span class="val" id="flareSizeVal">45</span>
+  </div>
+  <div class="row">
+    <label for="churn">Surface turbulence (convection)</label>
+    <input type="range" id="churn" min="1" max="10" value="4">
+    <span class="val" id="churnVal">4</span>
+  </div>
+  <div class="row">
+    <button id="triggerFlare">🔥 ERUPT FLARE</button>
+  </div>
+  <div class="legend">
+    Bright yellow-white = ~5,500°C surface plasma. Deep reds/oranges = cooling ejected material as it arcs
+    along reconnected magnetic field loops, mirroring real flare/filament eruptions observed by NASA's SDO.
+  </div>
+</div>
+
+<div class="scene">
+  <canvas id="auroraCanvas" width="960" height="480"></canvas>
+</div>
+<div class="controls">
+  <h2>Aurora Gas Chemistry</h2>
+  <div class="row">
+    <label for="oxygen">Atomic oxygen concentration</label>
+    <input type="range" id="oxygen" min="0" max="100" value="70">
+    <span class="val" id="oxygenVal">70</span>
+  </div>
+  <div class="row">
+    <label for="nitrogen">Nitrogen (N2 / N2+) concentration</label>
+    <input type="range" id="nitrogen" min="0" max="100" value="30">
+    <span class="val" id="nitrogenVal">30</span>
+  </div>
+  <div class="row">
+    <label for="stormStrength">Geomagnetic storm strength</label>
+    <input type="range" id="stormStrength" min="1" max="10" value="4">
+    <span class="val" id="stormVal">4</span>
+  </div>
+  <div class="row">
+    <button class="hemisphere" id="hemisphereToggle">🧭 Hemisphere: NORTHERN (Borealis)</button>
+  </div>
+  <div class="legend">
+    Above ~240 km: excited oxygen glows red (630 nm). 100–240 km: oxygen glows green (557.7 nm, most
+    common). Below ~100 km: molecular/ionized nitrogen glows blue-violet, blending with red oxygen to
+    create magenta and pink at the fringes. Higher storm strength pushes particles deeper, boosting red/magenta.
+  </div>
+</div>
+
+<script>
+// ===================== SUN + FLARE ENGINE =====================
+const sunCanvas = document.getElementById('sunCanvas');
+const sctx = sunCanvas.getContext('2d');
+const W1 = sunCanvas.width, H1 = sunCanvas.height;
+const sunCenter = { x: W1/2, y: H1/2 };
+const sunRadius = 150;
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+
+function noise2D(x, y, t) {
+  return Math.sin(x * 0.05 + t) * Math.cos(y * 0.05 - t * 0.7) +
+         Math.sin((x + y) * 0.02 + t * 1.3) * 0.5;
+}
+
+const surfaceParticles = [];
+for (let i = 0; i < 2200; i++) {
+  const angle = rand(0, Math.PI * 2);
+  const r = Math.sqrt(Math.random()) * sunRadius;
+  surfaceParticles.push({
+    baseAngle: angle,
+    baseR: r,
+    phase: rand(0, Math.PI * 2),
+    size: rand(1, 3)
+  });
+}
+
+let flareParticles = [];
+
+function colorForHeat(heat) {
+  const r = 255;
+  const g = Math.floor(80 + heat * 175);
+  const b = Math.floor(heat * heat * 140);
+  return `rgb(${r},${g},${b})`;
+}
+
+function spawnFlare(sizeFactor) {
+  const angle = rand(0, Math.PI * 2);
+  const count = Math.floor(30 + sizeFactor * 4);
+  const jetLength = 40 + sizeFactor * 3.2;
+  for (let i = 0; i < count; i++) {
+    const spread = rand(-0.25, 0.25);
+    flareParticles.push({
+      angle: angle + spread,
+      dist: sunRadius * 0.95,
+      speed: rand(1.2, 2.6) * (sizeFactor / 45),
+      arcHeight: jetLength * rand(0.7, 1.3),
+      life: 1.0,
+      decay: rand(0.004, 0.009),
+      size: rand(1.5, 3.5),
+      loopBias: rand(-0.5, 0.5)
+    });
+  }
+}
+
+let t1 = 0;
+function drawSun() {
+  t1 += 0.015;
+  sctx.fillStyle = '#000';
+  sctx.fillRect(0, 0, W1, H1);
+
+  const grad = sctx.createRadialGradient(sunCenter.x, sunCenter.y, sunRadius*0.5, sunCenter.x, sunCenter.y, sunRadius*1.8);
+  grad.addColorStop(0, 'rgba(255,200,80,0.35)');
+  grad.addColorStop(1, 'rgba(255,120,40,0)');
+  sctx.fillStyle = grad;
+  sctx.fillRect(0, 0, W1, H1);
+
+  const churn = parseFloat(document.getElementById('churn').value) / 4;
+
+  for (const p of surfaceParticles) {
+    const n = noise2D(p.baseR * Math.cos(p.baseAngle), p.baseR * Math.sin(p.baseAngle), t1 * churn);
+    const rJitter = p.baseR + n * 10 * churn;
+    const angleJitter = p.baseAngle + Math.sin(t1 + p.phase) * 0.03;
+    const x = sunCenter.x + Math.cos(angleJitter) * rJitter;
+    const y = sunCenter.y + Math.sin(angleJitter) * rJitter;
+    const heat = Math.max(0, 1 - rJitter / sunRadius) * 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(n * 3 + t1));
+    sctx.fillStyle = colorForHeat(Math.min(1, heat));
+    sctx.fillRect(x, y, p.size, p.size);
+  }
+
+  flareParticles = flareParticles.filter(f => f.life > 0);
+  for (const f of flareParticles) {
+    f.dist += f.speed;
+    f.life -= f.decay;
+    const arcProgress = Math.min(1, (f.dist - sunRadius*0.95) / f.arcHeight);
+    const curveOffset = Math.sin(arcProgress * Math.PI) * f.arcHeight * 0.6 * f.loopBias;
+    const x = sunCenter.x + Math.cos(f.angle) * f.dist + Math.cos(f.angle + Math.PI/2) * curveOffset;
+    const y = sunCenter.y + Math.sin(f.angle) * f.dist + Math.sin(f.angle + Math.PI/2) * curveOffset;
+    const heat = f.life;
+    sctx.fillStyle = colorForHeat(heat);
+    sctx.globalAlpha = Math.max(0, f.life);
+    sctx.fillRect(x, y, f.size, f.size);
+    sctx.globalAlpha = 1;
+  }
+
+  requestAnimationFrame(drawSun);
+}
+
+document.getElementById('triggerFlare').addEventListener('click', () => {
+  spawnFlare(parseFloat(document.getElementById('flareSize').value));
+});
+
+['flareSize','churn'].forEach(id => {
+  const el = document.getElementById(id);
+  const out = document.getElementById(id + 'Val');
+  el.addEventListener('input', () => out.textContent = el.value);
+});
+
+drawSun();
+
+// ===================== AURORA + TREE LINE ENGINE =====================
+const auroraCanvas = document.getElementById('auroraCanvas');
+const actx = auroraCanvas.getContext('2d');
+const W2 = auroraCanvas.width, H2 = auroraCanvas.height;
+
+let hemisphereNorth = true;
+document.getElementById('hemisphereToggle').addEventListener('click', () => {
+  hemisphereNorth = !hemisphereNorth;
+  document.getElementById('hemisphereToggle').textContent =
+    hemisphereNorth ? '🧭 Hemisphere: NORTHERN (Borealis)' : '🧭 Hemisphere: SOUTHERN (Australis)';
+});
+
+const stars = [];
+for (let i = 0; i < 150; i++) {
+  stars.push({ x: rand(0, W2), y: rand(0, H2 * 0.55), r: rand(0.4, 1.6), tw: rand(0, Math.PI*2) });
+}
+
+function drawTreeline() {
+  const baseY = H2 * 0.82;
+  actx.fillStyle = '#000';
+  actx.beginPath();
+  actx.moveTo(0, H2);
+  actx.lineTo(0, baseY);
+  let x = 0;
+  while (x < W2) {
+    const treeW = rand(14, 34);
+    const treeH = rand(20, 90);
+    actx.lineTo(x, baseY - treeH * rand(0.2,0.4));
+    actx.lineTo(x + treeW*0.5, baseY - treeH);
+    actx.lineTo(x + treeW, baseY - treeH * rand(0.2,0.4));
+    x += treeW;
+  }
+  actx.lineTo(W2, baseY);
+  actx.lineTo(W2, H2);
+  actx.closePath();
+  actx.fill();
+}
+
+const auroraCols = 140;
+const auroraRows = 60;
+const auroraGrid = [];
+for (let i = 0; i < auroraCols; i++) {
+  auroraGrid.push({ xBase: (i / auroraCols) * W2, phase: rand(0, Math.PI*2), speed: rand(0.5, 1.2) });
+}
+
+function gasColor(altitudeFrac, oxygen, nitrogen, storm) {
+  const deepPenetration = storm / 10;
+  const oxNorm = oxygen / 100, nNorm = nitrogen / 100;
+
+  const redWeight = oxNorm * Math.max(0, altitudeFrac - 0.55) * 2 * (0.6 + deepPenetration);
+  const greenWeight = oxNorm * Math.max(0, 1 - Math.abs(altitudeFrac - 0.35) * 2.2);
+  const blueWeight = nNorm * Math.max(0, 0.4 - altitudeFrac) * 2.5;
+  const magentaWeight = nNorm * redWeight * 1.4;
+
+  let r = greenWeight * 40 + redWeight * 255 + blueWeight * 60 + magentaWeight * 200;
+  let g = greenWeight * 255 + redWeight * 60 + blueWeight * 20;
+  let b = greenWeight * 90 + blueWeight * 255 + magentaWeight * 220 + redWeight * 30;
+
+  const norm = Math.max(r, g, b, 1);
+  r = Math.min(255, (r / norm) * 255 * 0.95 + 20);
+  g = Math.min(255, (g / norm) * 255 * 0.95 + 20);
+  b = Math.min(255, (b / norm) * 255 * 0.95 + 20);
+  return `rgb(${Math.floor(r)},${Math.floor(g)},${Math.floor(b)})`;
+}
+
+let t2 = 0;
+function drawAurora() {
+  t2 += 0.02;
+  actx.fillStyle = '#02030a';
+  actx.fillRect(0, 0, W2, H2);
+
+  for (const s of stars) {
+    const tw = 0.5 + 0.5 * Math.sin(t2*2 + s.tw);
+    actx.globalAlpha = 0.4 + tw * 0.6;
+    actx.fillStyle = '#dfe6ff';
+    actx.fillRect(s.x, s.y, s.r, s.r);
+  }
+  actx.globalAlpha = 1;
+
+  const oxygen = parseFloat(document.getElementById('oxygen').value);
+  const nitrogen = parseFloat(document.getElementById('nitrogen').value);
+  const storm = parseFloat(document.getElementById('stormStrength').value);
+
+  const topY = H2 * 0.06;
+  const bottomY = H2 * 0.62;
+
+  for (let row = 0; row < auroraRows; row++) {
+    const altitudeFrac = 1 - row / auroraRows;
+    const y = topY + (bottomY - topY) * (row / auroraRows);
+    for (let i = 0; i < auroraCols; i++) {
+      const col = auroraGrid[i];
+      const wave = Math.sin(t2 * col.speed + col.phase + row * 0.15) * 26;
+      const wave2 = Math.cos(t2 * 0.6 + i * 0.08) * 14;
+      const x = col.xBase + wave + wave2;
+      const density = Math.sin(i * 0.3 + t2 + row * 0.2);
+      if (density < 0.05) continue;
+      const color = gasColor(altitudeFrac, oxygen, nitrogen, storm);
+      actx.globalAlpha = 0.5 + 0.3 * Math.sin(t2*1.5 + row + i*0.1);
+      actx.fillStyle = color;
+      actx.fillRect(x, y, 2.4, 2.4);
+    }
+  }
+  actx.globalAlpha = 1;
+
+  drawTreeline();
+
+  actx.fillStyle = '#8a93c0';
+  actx.font = '12px monospace';
+  actx.fillText(hemisphereNorth ? 'AURORA BOREALIS' : 'AURORA AUSTRALIS', 14, 24);
+
+  requestAnimationFrame(drawAurora);
+}
+
+['oxygen','nitrogen','stormStrength'].forEach(id => {
+  const el = document.getElementById(id);
+  const out = document.getElementById(id === 'stormStrength' ? 'stormVal' : id + 'Val');
+  el.addEventListener('input', () => out.textContent = el.value);
+});
+
+drawAurora();
+</script>
+</body>
+</html>
