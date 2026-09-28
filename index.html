@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#07111f" />
+  <meta name="description" content="Aurora Lab — an interactive reduced-order solar weather and aurora simulator." />
+  <title>Aurora Lab — Solar Weather Observatory</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Aurora Lab home">
+        <span class="brand-mark" aria-hidden="true">◌</span>
+        <span><strong>AURORA LAB</strong><small>SOLAR WEATHER OBSERVATORY</small></span>
+      </a>
+      <div class="top-actions">
+        <span id="runState" class="state-chip">STANDBY</span>
+        <button id="modeToggle" class="ghost-button" type="button">RESEARCH MODE</button>
+        <button id="soundToggle" class="icon-button" type="button" aria-pressed="false" aria-label="Enable ambience">◌</button>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero-grid">
+        <div class="intro panel">
+          <p class="eyebrow">REDUCED-ORDER SPACE WEATHER MODEL</p>
+          <h1>Make a solar storm.<br /><em>Watch Earth respond.</em></h1>
+          <p class="lede">Shape a flare, launch a coronal mass ejection, and follow the energy from the Sun into Earth's magnetic field and polar atmosphere.</p>
+          <div class="hero-buttons">
+            <button id="launchButton" class="primary-button" type="button">LAUNCH SOLAR EVENT <span>↗</span></button>
+            <button id="resetButton" class="text-button" type="button">RESET LAB</button>
+          </div>
+          <div class="stage-line"><span class="stage-dot active"></span><span>Configure</span><i></i><span class="stage-dot"></span><span>Transit</span><i></i><span class="stage-dot"></span><span>Aurora</span></div>
+        </div>
+        <div class="sun-card panel">
+          <div class="panel-heading"><span>01 / SOLAR EVENT</span><span id="flareBadge">QUIET SUN</span></div>
+          <canvas id="sunCanvas" width="620" height="380" aria-label="Animated Sun and solar event view"></canvas>
+          <div class="sun-caption"><span><b id="flareClassReadout">M</b>-CLASS FLARE POTENTIAL</span><span id="sunStatus">ACTIVE REGION QUIET</span></div>
+        </div>
+      </section>
+
+      <section class="observatory-grid">
+        <div class="space-card panel">
+          <div class="panel-heading"><span>02 / INTERPLANETARY TRANSIT</span><span id="transitStatus">AWAITING LAUNCH</span></div>
+          <canvas id="spaceCanvas" width="900" height="300" aria-label="Solar wind and CME transit from Sun to Earth"></canvas>
+          <div class="range-track"><span>SUN</span><div><span id="transitBar"></span></div><span>EARTH</span></div>
+          <p id="phaseCopy" class="phase-copy">Set the event parameters, then launch the disturbance toward Earth.</p>
+        </div>
+        <aside class="controls panel">
+          <div class="panel-heading"><span>EVENT CONTROLS</span><span class="tiny-label">LIVE</span></div>
+          <label>FLARE CLASS <output id="flareValue">M</output><input id="flareInput" type="range" min="0" max="3" value="1" /></label>
+          <div class="scale-labels"><span>C</span><span>M</span><span>X</span><span>X+</span></div>
+          <label>CME VELOCITY <output id="speedValue">1,200 km/s</output><input id="speedInput" type="range" min="600" max="2400" step="50" value="1200" /></label>
+          <label>PARTICLE DENSITY <output id="densityValue">HIGH</output><input id="densityInput" type="range" min="1" max="5" value="4" /></label>
+          <label>IMF B<sub>z</sub> <output id="bzValue">−12 nT</output><input id="bzInput" type="range" min="-25" max="25" value="-12" /></label>
+          <div class="mini-note"><span class="info">i</span><p>Southward B<sub>z</sub> couples more efficiently with Earth's dayside magnetic field.</p></div>
+        </aside>
+      </section>
+
+      <section class="earth-grid">
+        <div class="earth-card panel">
+          <div class="panel-heading"><span>03 / MAGNETOSPHERIC RESPONSE</span><span id="earthStatus">QUIET FIELD</span></div>
+          <canvas id="earthCanvas" width="900" height="430" aria-label="Earth magnetosphere and aurora simulation"></canvas>
+          <div class="earth-caption"><span id="auroraLabel">POLAR OVAL DORMANT</span><span id="earthViewText">NIGHT-SIDE VIEW / EARTH FIELD NORMAL</span></div>
+        </div>
+        <aside class="telemetry panel">
+          <div class="panel-heading"><span>LIVE TELEMETRY</span><span class="signal"><i></i><i></i><i></i></span></div>
+          <div class="metric"><span>CME STATUS</span><strong id="metricCme">STANDBY</strong></div>
+          <div class="metric"><span>DYNAMIC PRESSURE</span><strong id="metricPressure">1.8 nPa</strong></div>
+          <div class="metric"><span>MAGNETOPAUSE</span><strong id="metricPause">10.2 R<sub>E</sub></strong></div>
+          <div class="metric"><span>FIELD COUPLING</span><strong id="metricCoupling">12%</strong></div>
+          <div class="metric"><span>AURORA POWER</span><strong id="metricPower">0.1 GW</strong></div>
+          <div class="metric"><span>POLAR LATITUDE</span><strong id="metricLatitude">—</strong></div>
+          <div class="telemetry-foot"><span>MODEL TICK</span><strong id="metricTick">00000</strong></div>
+        </aside>
+      </section>
+
+      <section class="science-grid">
+        <article class="science-copy panel">
+          <p class="eyebrow">WHY THE LIGHTS APPEAR</p>
+          <h2 id="scienceTitle">A quiet magnetosphere is still alive.</h2>
+          <p id="scienceCopy">Earth's magnetic field forms a protective cavity in the solar wind. Launch a solar event to see how pressure and magnetic orientation change the system.</p>
+        </article>
+        <article class="equation panel">
+          <p class="eyebrow">MODEL NOTES</p>
+          <div class="equation-line">P<sub>dynamic</sub> = ρv<sup>2</sup></div>
+          <p>Solar-wind pressure compresses the dayside magnetosphere. Energy coupling is modulated by the incoming magnetic-field orientation.</p>
+          <div class="equation-line small">F = q(E + v × B)</div>
+          <p>Particles are guided along an approximate dipole field toward the polar atmosphere.</p>
+        </article>
+      </section>
+    </main>
+    <footer><span>AURORA LAB / A REDUCED-ORDER SPACE WEATHER SIMULATOR</span><span>NOAA/NASA-INSPIRED MODEL • NOT A FORECAST</span></footer>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
